@@ -1,0 +1,220 @@
+- $router:
+    do:
+    - web.Application
+  # - $router:
+  #     do: chi.NewRouter
+
+- handler:
+  - get
+  - "/admin/list"
+  - sequence:
+    - mongoGet: yamls
+    - render:
+      - 'list.html'
+      - {
+          yamls: $seq,
+          processes: {processes: null}
+        }
+
+- handler:
+  - post
+  - "/admin/list"
+  - sequence:
+    - $yamls:
+        mongoGet: yamls
+    - $objectIdHex:
+        do:
+        - $requestBody.get
+        - run
+        - ""
+    - $processId:
+        do:
+        - $requestBody.get
+        - kill
+        - ""
+    - when:
+      - not: [$objectIdHex, ""]
+      - sequence:
+        - filter:
+          - $yamls
+          - is:
+            - str: $item._id
+            - $objectIdHex
+        - print: [here3, $seq]
+        - when:
+          - is:
+            - len: $seq
+            - 0
+          - exit:
+          - true # elseの意味
+          - null # 何もしない
+        - processStart:
+          - format:
+            - "%s%s"
+            - $objectIdHex
+            - now:
+          - parseYaml: "$seq[0].yaml"
+      - not: [$processId, ""]
+      - processKill: $processId
+    - render:
+      - 'list.html'
+      - {
+          yamls: $yamls,
+          processes: {processes: null}
+        }
+
+- handler:
+  - get
+  - "/admin/edit"
+  - render:
+    - 'edit.html'
+    - {}
+
+- handler:
+  - post
+  - "/admin/edit"
+  - sequence:
+    - mongoInsert:
+      - yamls
+      - {
+          yaml: {do: [$requestBody.get, yaml]},
+          name: wao
+        }
+    - redirect: "/admin/list"
+
+- handler:
+  - get
+  - "/admin/edit/{objectIdHex}"
+  - sequence:
+    - $objectIdHex:
+        do:
+          - $req.match_info.get
+          - objectIdHex
+    - $yamls:
+        mongoGet: yamls
+    - filter:
+      - $yamls
+      - is:
+        - str: $item._id
+        - $objectIdHex
+    - render:
+      - 'edit.html'
+      - "$seq[0]"
+
+- handler:
+  - post
+  - "/admin/edit/{objectIdHex}"
+  - sequence:
+    - $yaml:
+        do:
+          - $requestBody.get
+          - yaml
+    - $objectIdHex:
+        do:
+          - $req.match_info.get
+          - objectIdHex
+    - $yamls:
+        mongoGet: yamls
+    - filter:
+      - $yamls
+      - is:
+        - str: $item._id
+        - $objectIdHex
+    - $seq[0]
+    - $seq.yaml: $yaml
+    - $updated: $seq
+    - mongoReplace:
+      - yamls
+      - $updated
+    - render:
+      - 'edit.html'
+      - $updated
+
+- handler:
+  - get
+  - "/ws"
+  - render:
+    - "ws.html"
+    - {}
+
+- wsHandler:
+  - "/echo"
+  - sequence:
+    - print: $message
+    - when:
+      - is:
+        - $message.open
+        - true
+      - sequence:
+        - $channelListProcessId:
+            format:
+              - "%s%s"
+              - "channelList"
+              - now:
+        - processStart:
+          - $channelListProcessId
+          - subscribe:
+            - "channelList"
+            - wsWrite: {
+                subscribed: $subscribe,
+                channelName: "channelList",
+                timestamp: {now: null},
+              }
+            - [conn, message]
+        - wsWrite: {
+            subscribed: {channelList: null},
+            channelName: "channelList",
+            timestamp: {now: null},
+          }
+      - is:
+        - $message.close
+        - true
+      - sequence:
+        - processKill: $message.processId
+        - wsWrite: {
+            type: "subscribeEnd",
+            processId: $message.processId,
+          }
+      - is:
+        - $message.subscribe
+        - true
+      - sequence:
+        - $processId:
+            format:
+              - "%s%s"
+              - $message.channel
+              - now:
+        - processStart:
+          - $processId
+          - subscribe:
+            - $message.channel
+            - wsWrite: {
+                subscribed: $subscribe,
+                channelName: $channelName,
+                timestamp: {now: null},
+              }
+            - [conn, message]
+        - wsWrite: {
+            type: "subscribeStart",
+            channelName: $message.channel,
+            timestamp: {now: null},
+            processId: $processId,
+          }
+      - is:
+        - $message.publish
+        - true
+      - publish:
+        - $message.channel
+        - $message.json
+  #onclose
+  - sequence:
+    - processKill: $processId
+    - processKill: $channelListProcessId
+- do:
+  - web.run_app
+  - $router
+
+  # - do:
+  #   - http.ListenAndServe
+  #   - $PORT
+  #   - $router
