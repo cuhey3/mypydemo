@@ -212,7 +212,8 @@
     - processKill: $channelListProcessId
 - do:
   - web.run_app
-  - $router
+  - app: $router
+    port: $port
 
   # - do:
   #   - http.ListenAndServe
