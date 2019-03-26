@@ -15,7 +15,6 @@ pycurl==7.19.3
 pygobject
 pymongo==3.7.2
 pyparsing==2.0.1
-python-dateutil==2.0
 requests==2.2.1
 scipy==0.13.3
 six==1.5.2
