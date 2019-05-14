@@ -1,0 +1,15 @@
+<h3>
+    memo
+    <form action="" method="POST">
+        <textarea name="text"></textarea>
+        <input type="submit" value="送信"> 
+    </form>
+    <table>
+        {% for item in memos %}
+        <tr>
+            <td>{{item.create}}</td>
+            <td>{{item.text | nl2brAndNbsp}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</h3>

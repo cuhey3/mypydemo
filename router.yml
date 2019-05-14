@@ -132,10 +132,31 @@
 
 - handler:
   - get
-  - "/ws"
-  - render:
-    - "ws.html"
-    - {}
+  - "/memo"
+  - sequence:
+    - $memos:
+        mongoGet: memos
+    - print: $memos
+    - render:
+      - 'memo.html'
+      - memos: $memos
+        dummy: null
+
+- handler:
+  - post
+  - "/memo"
+  - sequence:
+    - print:
+      - do:
+        - $requestBody.get
+        - text
+    - mongoInsert:
+      - memos
+      - {
+          text: {do: [$requestBody.get, text]},
+          create: {now: null}
+        }
+    - redirect: "/memo"
 
 - wsHandler:
   - "/echo"
