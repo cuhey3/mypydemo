@@ -131,6 +131,12 @@
       - $updated
 
 - handler:
+  - "/ws"
+  - render:
+    - "ws.html"
+    - {}
+
+- handler:
   - get
   - "/memo"
   - sequence:
